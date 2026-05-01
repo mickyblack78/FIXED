@@ -262,47 +262,22 @@ canvas {
         updateBrushPreview();
     }
     
-        
-    } else {
-        el.style.display = 'flex';
-        btn.classList.add('active');
-
-        // [2026-04-28 14:58] EXCLUSIVE_GATE_LOGIC
-function toggleOverlay(id) {
-    // If another gate is already open, slam this one shut immediately.
-    if (appState.activeOverlay && appState.activeOverlay !== id && appState.activeOverlay !== 'tools') return;
-    if (id === 'color' && appState.isEditing) return;
-    if (id === 'menu' && appState.isEditing) return;
-
+    function toggleOverlay(id) {
     const el = document.getElementById(`overlay-${id}`);
-    const btn = document.getElementById(`btn-${id}`);
+    if (!el) return;
 
-    if (appState.activeOverlay === id || (id === 'menu' && appState.activeOverlay === 'tools')) {
-        // Manual Exit Only
-        el.style.display = 'none';
-        if (id === 'menu') {
-            document.getElementById('overlay-tools').style.display = 'none';
-            btn.innerText = 'MENU';
-        }
-        btn.classList.remove('active');
-        appState.activeOverlay = null;
-      else {
-        // Open Gate
+    const isOpen = el.style.display === 'flex';
+
+    // close all overlays first (temporary)
+    document.querySelectorAll('.overlay').forEach(o => o.style.display = 'none');
+
+    if (!isOpen) {
         el.style.display = 'flex';
-        btn.classList.add('active');
-        appState.activeOverlay = id;
     }
-}
-
-function toggleEdit() {
-    // Gate Check
-    if (appState.activeOverlay) return; 
-    appState.isEditing = !appState.isEditing;
-    document.getElementById('btn-edit').classList.toggle('active', appState.isEditing);
-}      appState.activeOverlay = id;
     }
-}
-    }
+    
+        
+       
 
     
     function switchOverlay(from, to) {
