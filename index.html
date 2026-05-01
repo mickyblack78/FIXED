@@ -220,6 +220,9 @@ canvas {
 </div>
 
 <script>
+    window.onerror = function (msg, src, line, col, err) {
+    alert("ERROR: " + msg + "\nLine: " + line);
+};
     const appState = {
         activeOverlay: null,
         isEditing: false,
