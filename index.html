@@ -479,4 +479,100 @@ async function triggerQSave() {
     
         
 
-    functi
+    function applyTool(name) {
+        appState.activeTool = name;
+        document.getElementById('btn-menu').innerText = name;
+        toggleOverlay('tools');
+    }
+
+    function toggleEdit() {
+        if (appState.activeOverlay) return;
+        appState.isEditing = !appState.isEditing;
+        document.getElementById('btn-edit').classList.toggle('active', appState.isEditing);
+    }
+
+    let colorTapTime = 0;
+        document.getElementById('btn-color').addEventListener('click', () => {
+        const now = Date.now();
+        if (now - colorTapTime < 300) {
+        const hCoord = Math.round((appState.penHue / 360) * 4000);
+        const sCoord = Math.round(appState.penShade * 40);
+        const code = `${hCoord}.${sCoord}`;
+        
+        if (appState.ledger.length >= 50) appState.ledger.pop();
+        appState.ledger.unshift({ code: code, color: appState.penColor });
+        console.log("SAVED_TO_NOTEPAD: " + code);
+            // [2026-04-28 14:58] COLOR_FLASH_RECEIPT
+document.getElementById('btn-color').addEventListener('click', () => {
+    const now = Date.now();
+    if (now - colorTapTime < 300) {
+        const hCoord = Math.round((appState.penHue / 360) * 4000);
+        const sCoord = Math.round(appState.penShade * 40);
+        const code = `${hCoord}.${sCoord}`;
+        
+        appState.ledger.unshift({ code: code, color: appState.penColor });
+        if (appState.ledger.length > 50) appState.ledger.pop();
+
+        // The Flash
+        const btn = document.getElementById('btn-color');
+        btn.style.boxShadow = '0 0 30px var(--neon-cyan), 0 0 60px var(--neon-cyan)';
+        setTimeout(() => { btn.style.boxShadow = ''; }, 150);
+        setTimeout(() => { 
+            btn.style.boxShadow = '0 0 30px var(--neon-cyan), 0 0 60px var(--neon-cyan)';
+            setTimeout(() => { btn.style.boxShadow = ''; }, 150);
+        }, 300);
+    }
+    colorTapTime = now;
+});
+    }
+ 
+    function setupLoupe(el, callback) {
+    let isDragging = false;
+
+    // Only starts dragging if you touch the actual 15mm Loupe
+    el.addEventListener('touchstart', (e) => { 
+        isDragging = true; 
+        e.stopPropagation(); 
+    });
+
+    window.addEventListener('touchmove', (e) => {
+        if (!isDragging) return;
+        const rect = el.parentElement.getBoundingClientRect();
+        
+        // Calculate 0.0 to 1.0 position
+        let percent = Math.max(0, Math.min(1, (e.touches[0].clientX - rect.left) / rect.width));
+        
+        // Convert to 4000 steps and snap to current GEAR
+        let snappedVal = Math.max(1, Math.min(4000, Math.round((percent * 4000) / appState.gear) * appState.gear));
+        
+        // Move the handle visually
+        el.style.left = `${(snappedVal / 4000) * 100}%`;
+        el.innerText = snappedVal;
+        
+        // Send value back to the brush
+        callback(snappedVal);
+    }, { passive: false });
+
+    window.addEventListener('touchend', () => { 
+        isDragging = false; 
+    });
+}
+
+// NOW ACTIVATE THE BARS
+setupLoupe(document.getElementById('loupe1'), (val) => {
+    if (appState.bar1Mode === 'HUE') appState.penHue = (val/4000)*360; 
+    else appState.penShade = (val/4000)*100;
+    updateMasterColor();
+});
+
+setupLoupe(document.getElementById('loupe2'), (val) => {
+    if (appState.bar2Mode === 'ELECTRIC') appState.penElectric = (val/4000)*100; 
+    else appState.penSize = (val/4000)*100;
+    updateMasterColor();
+});
+
+    window.addEventListener('load', init);
+    window.addEventListener('resize', init);
+</script>
+</body>
+</html>
