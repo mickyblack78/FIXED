@@ -327,16 +327,6 @@ document.getElementById('bar2-container').addEventListener('dblclick', () => {
     window.addEventListener('touchend', () => isDragging = false);
 }
 
-setupLoupe(document.getElementById('loupe1'), (val) => {
-    if (appState.bar1Mode === 'HUE') appState.penHue = (val/4000)*360; else appState.penShade = (val/4000)*100;
-    updateMasterColor();
-});
-
-setupLoupe(document.getElementById('loupe2'), (val) => {
-    if (appState.bar2Mode === 'ELECTRIC') appState.penElectric = (val/4000)*100; else appState.penSize = (val/4000)*100;
-    updateMasterColor();
-});
-
     function updateMasterColor() {
        const hCoord = Math.round((appState.penHue / 360) * 4000), sCoord = Math.round(appState.penShade * 40);
        appState.penColor = `hsl(${appState.penHue}, ${appState.penElectric || 100}%, ${appState.penShade}%)`;
