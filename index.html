@@ -4,6 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Universal Multimodal Repair Triage Suite</title>
+    <div style="display: flex; gap: 8px;">
+                <button id="btn-return-workbench" class="btn-action" style="display: none;">← Open Camera</button>
+    </div>
     <style>
         /* Base Reset & Core Fluid Theme Rules */
         * {
@@ -296,6 +299,35 @@
         .btn-triage:active {
             background-color: #e08a00;
         }
+        /* State Framework Loading & Animation Configurations */
+        #processing-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(13, 15, 18, 0.95);
+            z-index: 50;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 24px;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #1e2530;
+            border-top: 4px solid #ff9d00;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
     </style>
 </head>
 <body>
@@ -340,6 +372,23 @@
             </section>
 
             <div id="workspace-hud">
+                <section id="processing-overlay" style="display: none;">
+                <div class="spinner"></div>
+                <h3 style="color: #ffffff; margin-bottom: 8px;">Analyzing Image Vectors</h3>
+                
+                <div style="background-color: #14181f; border: 1px solid #232a36; padding: 16px; border-radius: 8px; max-width: 320px; text-align: center; margin-top: 12px;">
+                    <span style="font-size: 0.75rem; color: #ff9d00; font-weight: 600; uppercase; letter-spacing: 1px; display: block; margin-bottom: 6px;">Triage Fact Bite</span>
+                    <p id="fact-display-target" style="color: #cbd5e1; font-size: 0.85rem; line-height: 1.4;">Preparing system diagnostics...</p>
+                </div>
+            </section>
+
+            <section id="results-panel" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-color: #0d0f12; z-index: 40; padding: 20px; overflow-y: auto; display: none;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid #232a36;">
+                    <h2 style="font-size: 1.2rem; color: #ff9d00;">Action Repair Sequence</h2>
+                    <span style="font-size: 0.75rem; color: #52637a; font-family: monospace;">CACHE_RESTORE_ACTIVE</span>
+                </div>
+                <div id="results-content-target" style="color: #cbd5e1; font-size: 0.95rem; line-height: 1.6;"></div>
+            </section>
                 <video id="camera-feed" autoplay playsinline></video>
 
                 <div class="workbench-controls">
@@ -351,16 +400,27 @@
         </main>
     </div>
 
-    <script>
+    <            <script>
         (function() {
             // Global App State Scope Registry
             const AppConfig = {
-                storageNamespace: 'triage_repair_engine_key',
+                keys: {
+                    api: 'triage_repair_engine_key',
+                    cache: 'triage_active_steps_cache'
+                },
                 activeState: 'GATEKEEPER',
                 runtimeKey: null,
                 cameraStream: null,
-                currentFacingMode: 'environment' // 'environment' = rear camera, 'user' = front selfie camera
+                currentFacingMode: 'environment', // 'environment' = back camera, 'user' = front camera
+                factInterval: null
             };
+
+            // Curated Fast Fact Database for Waiting Rotation
+            const RepairFacts = [
+                "Always check for corrosion on wiring connectors before assuming a module is dead; green oxidation acts like a permanent open circuit.",
+                "When tracking electrical faults, always test your multimeter on a known power source first to verify your meter's ground and battery are good.",
+                "If an engine won't crank after an intense external wash or water crossing, remove the glow plugs or spark plugs before turning it over to prevent hydrostatic lock."
+            ];
 
             // DOM Element Map
             const DOM = {
@@ -374,17 +434,92 @@
                 workspaceHud: document.getElementById('workspace-hud'),
                 video: document.getElementById('camera-feed'),
                 toggleCamBtn: document.getElementById('btn-toggle-camera'),
-                runAnalysisBtn: document.getElementById('btn-run-analysis')
+                runAnalysisBtn: document.getElementById('btn-run-analysis'),
+                processingOverlay: document.getElementById('processing-overlay'),
+                factDisplay: document.getElementById('fact-display-target'),
+                resultsPanel: document.getElementById('results-panel'),
+                resultsTarget: document.getElementById('results-content-target'),
+                returnWorkbenchBtn: document.getElementById('btn-return-workbench')
             };
 
             // State Alpha Initialization Vector
             window.addEventListener('DOMContentLoaded', () => {
-                const cachedKey = localStorage.getItem(AppConfig.storageNamespace);
+                const cachedKey = localStorage.getItem(AppConfig.keys.api);
+                const cachedSteps = localStorage.getItem(AppConfig.keys.cache);
+
                 if (cachedKey && cachedKey.startsWith('AIzaSy')) {
                     AppConfig.runtimeKey = cachedKey;
-                    transitionToWorkspace();
+                    
+                    // Safety check: If user had an uncompleted repair stored, jump straight back to it
+                    if (cachedSteps) {
+                        setApplicationState('DISPLAY_STEPS', cachedSteps);
+                    } else {
+                        setApplicationState('WORKSPACE');
+                    }
+                } else {
+                    setApplicationState('GATEKEEPER');
                 }
             });
+
+            // Central Application State Machine Controller
+            function setApplicationState(targetState, payload = null) {
+                AppConfig.activeState = targetState;
+                
+                // Clear any running timers to prevent background memory leaks
+                clearInterval(AppConfig.factInterval);
+
+                // Default Reset: Hide all primary UI layers dynamically
+                DOM.overlay.style.display = 'none';
+                DOM.workspaceHud.style.display = 'none';
+                DOM.processingOverlay.style.display = 'none';
+                DOM.resultsPanel.style.display = 'none';
+                DOM.purgeBtn.style.display = 'none';
+                DOM.returnWorkbenchBtn.style.display = 'none';
+
+                switch(targetState) {
+                    case 'GATEKEEPER':
+                        DOM.overlay.style.display = 'flex';
+                        teardownHardwareTracks();
+                        break;
+
+                    case 'WORKSPACE':
+                        DOM.workspaceHud.style.display = 'block';
+                        DOM.purgeBtn.style.display = 'block';
+                        initCameraSystem();
+                        break;
+
+                    case 'LOADING':
+                        DOM.workspaceHud.style.display = 'block'; // Keep viewfinder behind glass if needed
+                        DOM.processingOverlay.style.display = 'flex';
+                        startFactRotationLoop();
+                        break;
+
+                    case 'DISPLAY_STEPS':
+                        DOM.resultsPanel.style.display = 'block';
+                        DOM.returnWorkbenchBtn.style.display = 'block';
+                        DOM.purgeBtn.style.display = 'block';
+                        teardownHardwareTracks(); // Free camera lens while reading instructions
+                        
+                        if (payload) {
+                            DOM.resultsTarget.innerHTML = payload;
+                            localStorage.setItem(AppConfig.keys.cache, payload);
+                        }
+                        break;
+                }
+            }
+
+            // Fact Rotation Timing Management Loop
+            function startFactRotationLoop() {
+                let currentIndex = 0;
+                // Instantly display the first random fact
+                DOM.factDisplay.textContent = RepairFacts[currentIndex];
+                
+                // Rotate to a new fact every 5 seconds
+                AppConfig.factInterval = setInterval(() => {
+                    currentIndex = (currentIndex + 1) % RepairFacts.length;
+                    DOM.factDisplay.textContent = RepairFacts[currentIndex];
+                }, 5000);
+            }
 
             // Handle Terms Validation Gate
             DOM.termsCheck.addEventListener('change', (e) => {
@@ -413,9 +548,9 @@
             DOM.lockBtn.addEventListener('click', () => {
                 const targetedKey = DOM.keyInput.value.trim();
                 if (targetedKey.startsWith('AIzaSy') && targetedKey.length > 20) {
-                    localStorage.setItem(AppConfig.storageNamespace, targetedKey);
+                    localStorage.setItem(AppConfig.keys.api, targetedKey);
                     AppConfig.runtimeKey = targetedKey;
-                    transitionToWorkspace();
+                    setApplicationState('WORKSPACE');
                 } else {
                     DOM.errorMsg.style.display = 'block';
                 }
@@ -459,33 +594,43 @@
                 initCameraSystem();
             });
 
-            // Transition UI View States & Initialize Viewfinder
-            function transitionToWorkspace() {
-                AppConfig.activeState = 'WORKSPACE';
+            // Return to Camera Event from Results View
+            DOM.returnWorkbenchBtn.addEventListener('click', () => {
+                // Clear the active cache so it doesn't permanently lock the view on reload
+                localStorage.removeItem(AppConfig.keys.cache);
+                setApplicationState('WORKSPACE');
+            });
+
+            // Temporary Simulation Click Handler for Testing Block 3 Interface
+            DOM.runAnalysisBtn.addEventListener('click', () => {
+                setApplicationState('LOADING');
                 
-                DOM.overlay.style.display = 'none';
-                DOM.keyInput.value = ''; 
-                
-                DOM.purgeBtn.style.display = 'block';
-                DOM.workspaceHud.style.display = 'block';
-                
-                initCameraSystem();
-            }
+                // Simulate a 6-second API processing wait, then reveal dummy repair instructions
+                setTimeout(() => {
+                    const dummyPayload = `
+                        <ol style="padding-left: 20px; margin-top: 10px;">
+                            <li style="margin-bottom: 12px;"><strong>Isolate Electrical Group:</strong> Turn off system ignition completely before touching the visual lead points.</li>
+                            <li style="margin-bottom: 12px;"><strong>Clear Exterior Contamination:</strong> Wipe excess oil sludge from the harness casing using a clean dry shop rag.</li>
+                            <li style="margin-bottom: 12px;"><strong>Reseat Connection Clips:</strong> Depress the upper locking plastic thumb tang firmly until an audible click engagement pattern registers.</li>
+                        </ol>
+                    `;
+                    setApplicationState('DISPLAY_STEPS', dummyPayload);
+                }, 6000);
+            });
 
             // Purge Device Memory Cache Handler
             DOM.purgeBtn.addEventListener('click', () => {
                 teardownHardwareTracks();
-                localStorage.removeItem(AppConfig.storageNamespace);
+                localStorage.removeItem(AppConfig.keys.api);
+                localStorage.removeItem(AppConfig.keys.cache);
                 AppConfig.runtimeKey = null;
-                AppConfig.activeState = 'GATEKEEPER';
                 
                 DOM.termsCheck.checked = false;
                 DOM.stepsContainer.style.opacity = '0.4';
                 DOM.stepsContainer.style.pointerEvents = 'none';
                 DOM.lockBtn.disabled = true;
-                DOM.purgeBtn.style.display = 'none';
-                DOM.workspaceHud.style.display = 'none';
-                DOM.overlay.style.display = 'flex';
+                
+                setApplicationState('GATEKEEPER');
             });
         })();
     </script>
