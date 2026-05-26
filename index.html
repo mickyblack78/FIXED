@@ -1,542 +1,390 @@
-<!DOCTYPE html> 
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>ARCHITECT_101</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Universal Multimodal Repair Triage Suite</title>
     <style>
-        :root {
-            --neon-cyan: #00ffff;
-            --electric-blue: #2e5bff;
-            --neon-glow: rgba(0, 255, 255, 0.4);
-            --bg: #000000;
-            --panel: rgba(10, 10, 10, 0.98);
-            --safe-zone: 60px;
-        }
-
+        /* Base Reset & Core Fluid Theme Rules */
         * {
-            margin: 0; padding: 0; box-sizing: border-box;
-            -webkit-touch-callout: none; -webkit-user-select: none;
-            user-select: none; touch-action: none;
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+            -webkit-user-select: none;
         }
 
-        body { background: var(--bg); height: 100vh; width: 100vw; overflow: hidden; font-family: monospace; }
-
-        /* [2026-04-28 14:58] TEMPLATE_FRAME_FIX */
-:root {
-    --top-padding: 40px; /* Space for Android Status Bar */
-    --bottom-padding: 160px; /* Space for the Dock and Safety */
-}
-
-#canvas-wrap { 
-    position: absolute; 
-    top: var(--top-padding); 
-    left: 0; 
-    width: 100%; 
-    height: calc(100% - var(--top-padding) - var(--bottom-padding)); 
-    z-index: 1;
-    background: #050505; /* Workspace background */
-}
-
-canvas { 
-    position: absolute; 
-    top: 0; 
-    left: 0; 
-    width: 100%; 
-    height: 100%; 
-    display: block;
-}
-        #main-canvas { z-index: 10; }
-        #temp-canvas { z-index: 20; }
-
-        .dock {
-            position: fixed; bottom: var(--safe-zone); left: 50%;
-            transform: translateX(-50%); z-index: 1000;
-            display: flex; gap: 15px; padding: 15px 25px;
-            background: var(--panel); border: 1px solid var(--neon-cyan);
-            border-radius: 60px; box-shadow: 0 0 25px var(--neon-glow);
+        body, html {
+            width: 100%;
+            height: 100%;
+            background-color: #0d0f12;
+            color: #e3e6eb;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            overflow: hidden;
         }
 
-        .btn {
-            width: 65px; height: 50px; border-radius: 25px;
-            border: 1px solid #333; background: #000;
-            display: flex; align-items: center; justify-content: center;
-            color: #666; font-size: 11px; font-weight: 900; transition: 0.2s;
+        /* Fixed App Frame Layout */
+        #app-viewport {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
         }
 
-        /* DYNAMIC STATES */
-        .btn.active { border-color: var(--neon-cyan); color: var(--neon-cyan); box-shadow: 0 0 15px var(--neon-glow); }
-        .btn.qsave-active { border-color: var(--electric-blue) !important; color: var(--electric-blue) !important; box-shadow: 0 0 25px var(--electric-blue) !important; }
-        .btn.locked { opacity: 0.3; pointer-events: none; }
-
-        /* OVERLAYS */
-        .overlay {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.95); z-index: 2000; display: none;
-            flex-direction: column; align-items: center; justify-content: center;
+        /* Header Layout Matrix */
+        header {
+            width: 100%;
+            padding: 16px;
+            background-color: #14181f;
+            border-bottom: 1px solid #232a36;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 10;
         }
 
-        /* 3x5 GRID */
-        .grid-3x5 {
-            display: grid; grid-template-columns: repeat(3, 1fr);
-            gap: 15px; width: 90%; max-width: 400px;
+        header h1 {
+            font-size: 1.1rem;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            color: #4f96ff;
         }
 
-        .grid-btn {
-            aspect-ratio: 1; background: #111; border: 1px solid #333;
-            display: flex; align-items: center; justify-content: center;
-            color: #fff; font-size: 10px; text-align: center;
+        /* Action Buttons */
+        .btn-action {
+            background-color: #1e2530;
+            color: #e3e6eb;
+            border: 1px solid #384357;
+            padding: 8px 14px;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: background 0.2s, border-color 0.2s;
         }
 
-        /* MENU LIST */
-        .menu-list { width: 80%; max-width: 300px; display: flex; flex-direction: column; gap: 10px; }
-        .menu-row { display: flex; gap: 10px; width: 100%; }
-        .menu-item { 
-            flex: 1; padding: 20px; background: #111; border: 1px solid #444; 
-            color: white; text-align: center; font-size: 12px;
+        .btn-action:active {
+            background-color: #283242;
+            border-color: #4f96ff;
         }
 
-        /* 80mm VAULT DISPLAY */
-        .vault-stack { display: flex; flex-direction: column; gap: 20px; align-items: center; }
-        .vault-box {
-            width: 80mm; height: 80mm; border: 1px solid #333;
-            background: #050505; position: relative; overflow: hidden;
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
-        }
-        .vault-box.active-v { border-color: var(--neon-cyan); box-shadow: 0 0 15px var(--neon-glow); }
-        .vault-box img { max-width: 100%; max-height: 100%; object-fit: contain; }
-        .vault-label { position: absolute; top: 5px; left: 5px; font-size: 8px; color: #555; }
-
-        /* UNIVERSAL VAULT MENU */
-        .vault-menu { display: flex; gap: 10px; margin-top: 15px; width: 80mm; }
-        .v-btn { flex: 1; padding: 10px; font-size: 10px; background: #111; border: 1px solid #444; color: white; text-align: center; }
-        .v-delete { color: #ff0000; }
-        .v-delete.flash { animation: flashRed 0.5s infinite; }
-
-        @keyframes flashRed { 0% { background: #000; } 50% { background: #600; } 100% { background: #000; } }
-
-        .slider-wrap {
-            position: fixed; bottom: 140px; left: 50%;
-            transform: translateX(-50%); width: 80%;
-            display: flex; flex-direction: column; gap: 15px;
-            align-items: center; background: none;
+        /* Main Workspace Target Area */
+        #main-workspace {
+            flex: 1;
+            width: 100%;
+            position: relative;
+            background-color: #090b0d;
         }
 
-        input[type=range] {
-            width: 100%; height: 5mm; /* 5mm physical height */
-            appearance: none; -webkit-appearance: none;
-            background: #222; border: 1px solid #444;
-            border-radius: 0; outline: none;
+        /* Secure Gatekeeper Modal Overlay */
+        #gatekeeper-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #0d0f12;
+            z-index: 100;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            overflow-y: auto;
         }
 
-        /* The "Thumb" (The 1-50 Indicator) */
-        input[type=range]::-webkit-slider-thumb {
-            -webkit-appearance: none; width: 10px; height: 10px;
-            background: #fff; border: 1px solid #000; cursor: pointer;
+        .modal-card {
+            background-color: #14181f;
+            border: 1px solid #232a36;
+            border-radius: 12px;
+            width: 100%;
+            max-width: 480px;
+            padding: 24px;
+            box-shadow: 0 12px 32px rgba(0,0,0,0.5);
+        }
+
+        .modal-card h2 {
+            font-size: 1.3rem;
+            color: #ffffff;
+            margin-bottom: 12px;
+        }
+
+        .modal-card p {
+            font-size: 0.9rem;
+            color: #9aa5b5;
+            line-height: 1.5;
+            margin-bottom: 16px;
+        }
+
+        /* Legal / Terms Constraints Block */
+        .terms-box {
+            background-color: #090b0d;
+            border: 1px solid #1e2530;
+            border-radius: 6px;
+            padding: 12px;
+            height: 110px;
+            overflow-y: auto;
+            font-size: 0.8rem;
+            color: #7b889b;
+            line-height: 1.4;
+            margin-bottom: 16px;
+        }
+
+        .terms-acceptance {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            margin-bottom: 20px;
+            font-size: 0.85rem;
+            color: #cfd6e0;
+            cursor: pointer;
+        }
+
+        .terms-acceptance input {
+            margin-top: 3px;
+            cursor: pointer;
+        }
+
+        /* Setup Action Steps Layout */
+        .step-instruction {
+            font-size: 0.85rem;
+            color: #9aa5b5;
+            margin-bottom: 8px;
+            font-weight: 500;
+        }
+
+        .btn-link {
+            display: block;
+            text-align: center;
+            width: 100%;
+            background-color: #2b3545;
+            color: #ffffff;
+            text-decoration: none;
+            padding: 10px;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            border: 1px solid #3c4b61;
+            margin-bottom: 16px;
+        }
+
+        .btn-link:active {
+            background-color: #364357;
+            border-color: #4f96ff;
+        }
+
+        /* Secure Key Insertion Field */
+        .key-input-wrapper {
+            width: 100%;
+            display: flex;
+            gap: 8px;
+            margin-top: 8px;
+        }
+
+        .input-secret {
+            flex: 1;
+            background-color: #090b0d;
+            border: 1px solid #232a36;
+            color: #ffffff;
+            padding: 10px 12px;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            font-family: monospace;
+            outline: none;
+        }
+
+        .input-secret:focus {
+            border-color: #4f96ff;
+        }
+
+        .btn-lock {
+            background-color: #1a5cff;
+            color: #ffffff;
+            border: none;
+            padding: 10px 16px;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            cursor: pointer;
+        }
+
+        .btn-lock:active {
+            background-color: #0040dd;
+        }
+
+        .btn-lock:disabled {
+            background-color: #1e2530;
+            color: #4e5d73;
+            cursor: not-allowed;
+        }
+
+        /* Error Status Message HUD */
+        #onboarding-error {
+            color: #ff4a4a;
+            font-size: 0.8rem;
+            margin-top: 8px;
+            display: none;
+        }
+
+        /* Core Application UI Panels (Hidden by Default) */
+        #workspace-hud {
+            display: none;
+            padding: 16px;
+            color: #a3b0c2;
+            font-size: 0.9rem;
         }
     </style>
 </head>
 <body>
 
-<div id="canvas-wrap">
-    <canvas id="main-canvas"></canvas>
-    <canvas id="temp-canvas"></canvas>
-</div>
+    <div id="app-viewport">
+        <!-- Main Application Navigation Header -->
+        <header>
+            <h1>UNIVERSAL REPAIR SQUAD</h1>
+            <button id="btn-purge-key" class="btn-action" style="display: none;">Wipe Device Cache</button>
+        </header>
 
-<div class="dock" id="main-dock">
-    <div class="btn" id="btn-menu" onclick="toggleOverlay('menu')">MENU</div>
-    <div class="btn" id="btn-qsave" onclick="triggerQSave()">QSAVE</div>
-    <div class="btn" id="btn-color" onclick="toggleOverlay('color')">COLOR</div>
-    <div class="btn" id="btn-edit" onclick="toggleEdit()">EDIT</div>
-</div>
+        <!-- Dynamic Content Engine Root -->
+        <main id="main-workspace">
+            
+            <!-- Gatekeeper Security Card Layer -->
+            <section id="gatekeeper-overlay">
+                <div class="modal-card">
+                    <h2>Initialization Required</h2>
+                    <p>This is a secure, decentralized web tool executing 100% locally. To access processing power without intermediate host billing, you must supply your private Google AI Studio validation key.</p>
+                    
+                    <div class="terms-box">
+                        TERMS OF USE & PRIVACY DATA POLICY:<br>
+                        1. Your API configuration key is written natively to local, hardware-level storage (localStorage).<br>
+                        2. No data strings, keys, or metadata are transmitted to external servers except direct encrypted payloads destined for the Google API system endpoint.<br>
+                        3. Exceeding model limits will result in standard rate limit pauses, which will not trigger financial charges unless you manually transition your personal AI Studio sandbox to a paid billing structure.
+                    </div>
 
-<div class="overlay" id="overlay-menu">
-    <div class="menu-list">
-        <div class="menu-row">
-            <div class="menu-item">SAVE</div>
-            <div class="menu-item">SAVE AS</div>
-        </div>
-        <div class="menu-row">
-            <div class="menu-item">LOAD</div>
-            <div class="menu-item">IMPORT</div>
-        </div>
-        <div class="menu-item" style="background: var(--neon-cyan); color: #000;" onclick="switchOverlay('menu', 'tools')">TOOLS</div>
-        <div class="menu-item" onclick="switchOverlay('menu', 'vault')">VAULTS</div>
+                    <label class="terms-acceptance">
+                        <input type="checkbox" id="chk-terms-verify">
+                        <span>I understand that this file runs locally, and I accept the security architecture parameters outlined above.</span>
+                    </label>
+
+                    <div id="onboarding-steps" style="opacity: 0.4; pointer-events: none;">
+                        <div class="step-instruction">Step 1: Request a Free Sandbox Token</div>
+                        <a href="https://aistudio.google.com/" target="_blank" class="btn-link">Go to Google AI Studio</a>
+
+                        <div class="step-instruction">Step 2: Input and Bind Token to Chip</div>
+                        <div class="key-input-wrapper">
+                            <input type="password" id="field-api-key" class="input-secret" placeholder="Paste your API key (AIzaSy...)" autocomplete="off">
+                            <button id="btn-submit-lock" class="btn-lock" disabled>Lock Key</button>
+                        </div>
+                        <div id="onboarding-error">Invalid key format. Ensure the token begins with 'AIzaSy' and contains no hidden trailing space characters.</div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Main App Content (Placeholder for Module 2/3 Integration) -->
+            <div id="workspace-hud">
+                <div style="background-color: #14181f; border: 1px solid #232a36; padding: 16px; border-radius: 8px;">
+                    <h3>Engine Verified & Loaded Successfully.</h3>
+                    <p style="margin-top: 8px; font-size: 0.85rem; color: #7b889b;">The key has been locked down into hardware localStorage sandbox. Ready for Phase 2: Touch Matrix integration loop.</p>
+                </div>
+            </div>
+
+        </main>
     </div>
-</div>
 
-<div class="overlay" id="overlay-vault">
-    <div class="vault-stack">
-        <div class="vault-box" id="box-qsave" onclick="focusVault('qsave')">
-            <span class="vault-label">QSAVE_SLOT</span>
-            <img id="img-qsave-v" src="" alt="">
-        </div>
-        <div class="vault-box" id="box-save" onclick="focusVault('save')">
-            <span class="vault-label">SAVE_VAULT</span>
-            <img id="img-save-v" src="" alt="">
-        </div>
-        <div class="vault-menu">
-            <div class="v-btn" onclick="vaultAction('EDIT')">EDIT</div>
-            <div class="v-btn" onclick="vaultAction('SAVEAS')">SAVE AS</div>
-            <div class="v-btn v-delete" id="v-del-btn" onclick="vaultAction('DELETE')">DELETE</div>
-        </div>
-        <div class="v-btn" style="width: 80mm; margin-top:10px;" onclick="switchOverlay('vault', 'menu')">BACK</div>
-    </div>
-</div>
-
-<div class="overlay" id="overlay-tools">
-    <div class="grid-3x5">
-        <div class="grid-btn" onclick="applyTool('STICKER')">STICKER</div>
-        <div class="grid-btn" onclick="applyTool('UNDO')">UNDO</div>
-        <div class="grid-btn" onclick="applyTool('SMOOTH')">SMOOTH</div>
-        <div class="grid-btn" onclick="applyTool('TEXT')">TEXT</div>
-        <div class="grid-btn" onclick="applyTool('EFFECTS')">EFFECTS</div>
-        <div class="grid-btn" onclick="applyTool('ERASER')">ERASER</div>
-        <div class="grid-btn" onclick="applyTool('CUT')">CUT</div>
-        <div class="grid-btn" onclick="applyTool('COPY')">COPY</div>
-        <div class="grid-btn" onclick="applyTool('PASTE')">PASTE</div>
-        <div class="grid-btn" onclick="applyTool('FILL')">FILL</div>
-        <div class="grid-btn" onclick="applyTool('PICKER')">PICKER</div>
-        <div class="grid-btn" onclick="applyTool('PH...AI')">PH...AI</div>
-        <div class="grid-btn">PH_13</div>
-        <div class="grid-btn">PH_14</div>
-        <div class="grid-btn">PH_15</div>
-    </div>
-</div>
-
-<div class="overlay" id="overlay-color" style="background: none; pointer-events: none;">
-    <div style="display: flex; align-items: center; justify-content: center; gap: 20px; pointer-events: auto; margin-bottom: 20px;">
-        <div id="brush-preview" style="width: 50px; height: 50px; border-radius: 50%; border: 2px solid #fff;"></div>
-        <button id="gear-shifter" onclick="cycleGear()" style="background: #111; color: #0ff; border: 1px solid #0ff; padding: 10px; border-radius: 5px;">GEAR: 50</button>
-    </div>
-    <div class="bar-container" id="bar1-container" style="position: relative; height: 60px; width: 90%; pointer-events: auto; margin-bottom: 20px;">
-        <div id="bar1-bg" style="position: absolute; top: 25px; width: 100%; height: 8px; background: linear-gradient(to right, red, yellow, green, cyan, blue, magenta, red); border-radius: 4px;"></div>
-        <div id="loupe1" style="position: absolute; width: 15mm; height: 15mm; border-radius: 50%; border: 3px solid white; top: 0px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; justify-content: center; font-size: 10px; color: white; background: #888;">2000</div>
-    </div>
-    <div class="bar-container" id="bar2-container" style="position: relative; height: 60px; width: 90%; pointer-events: auto;">
-        <div id="bar2-bg" style="position: absolute; top: 25px; width: 100%; height: 8px; background: linear-gradient(to right, #222, #0ff); border-radius: 4px;"></div>
-        <div id="loupe2" style="position: absolute; width: 15mm; height: 15mm; border-radius: 50%; border: 3px solid white; top: 0px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; justify-content: center; font-size: 10px; color: white; background: #888;">2000</div>
-    </div>
-</div>
-
-<script>
-    window.onerror = function (msg, src, line, col, err) {
-    alert("ERROR: " + msg + "\nLine: " + line);
-};
-    const appState = {
-        activeOverlay: null,
-        isEditing: false,
-        activeTool: 'PEN',
-        projectName: 'PROJECT',
-        penColor: '#00ffff',
-        penSize: 20,
-        penShade: 50,
-        penHue: 180,
-        h: 2000, 
-        t: 2000, 
-        e: 2000, 
-        s: 20,
-        gear: 50,
-        gears: [1, 5, 10, 50, 100, 200, 500],
-        gearIdx: 3,
-        bar1Mode: 'HUE',
-        bar2Mode: 'ELECTRIC',
-        ledger: [],
-        focusedVault: 'qsave',
-        isRelaying: false,
-        dpr: window.devicePixelRatio || 1,
-        // RELAY SLOTS (Hidden)
-        slot_qsave: null,
-        slot_vault: null
-    };
-
-    const main = document.getElementById('main-canvas');
-    const temp = document.getElementById('temp-canvas');
-    const mctx = main.getContext('2d');
-    const tctx = temp.getContext('2d');
-
-    function init() {
-        main.width = temp.width = window.innerWidth * appState.dpr;
-        main.height = temp.height = window.innerHeight * appState.dpr;
-        main.style.width = temp.style.width = window.innerWidth + 'px';
-        main.style.height = temp.style.height = window.innerHeight + 'px';
-        mctx.scale(appState.dpr, appState.dpr);
-        tctx.scale(appState.dpr, appState.dpr);
-        updateBrushPreview();
-    }
-    
-    function toggleOverlay(id) {
-    const el = document.getElementById(`overlay-${id}`);
-    if (!el) return;
-
-    const isOpen = el.style.display === 'flex';
-
-    // close all overlays first (temporary)
-    document.querySelectorAll('.overlay').forEach(o => o.style.display = 'none');
-
-    if (!isOpen) {
-        el.style.display = 'flex';
-    }
-    }
-    
-    function switchOverlay(from, to) {
-        document.getElementById(`overlay-${from}`).style.display = 'none';
-        document.getElementById(`overlay-${to}`).style.display = 'flex';
-        appState.activeOverlay = to;
-    }
-
-    function lockDock(exception) {
-        document.querySelectorAll('.btn').forEach(b => {
-            if (b.id !== `btn-${exception}` && b.id !== 'btn-qsave') {
-                b.classList.add('locked');
-            }
-        });
-    }
-
-    function cycleGear() {
-    appState.gearIdx = (appState.gearIdx + 1) % appState.gears.length;
-    appState.gear = appState.gears[appState.gearIdx];
-    document.getElementById('gear-shifter').innerText = `GEAR: ${appState.gear}`;
-}
-
-document.getElementById('bar1-container').addEventListener('dblclick', () => {
-    appState.bar1Mode = appState.bar1Mode === 'HUE' ? 'TONE' : 'HUE';
-    document.getElementById('bar1-bg').style.background = appState.bar1Mode === 'HUE' 
-        ? 'linear-gradient(to right, red, yellow, green, cyan, blue, magenta, red)' 
-        : 'linear-gradient(to right, #000, #888, #fff)';
-    updateMasterColor();
-});
-
-document.getElementById('bar2-container').addEventListener('dblclick', () => {
-    appState.bar2Mode = appState.bar2Mode === 'ELECTRIC' ? 'STROKE' : 'ELECTRIC';
-    document.getElementById('bar2-bg').style.background = appState.bar2Mode === 'ELECTRIC'
-        ? 'linear-gradient(to right, #111, #0ff)' 
-        : 'linear-gradient(to right, rgba(255,255,255,0.1), rgba(255,255,255,1))';
-    updateMasterColor();
-});
-    
-    function setupLoupe(el, callback) {
-    let isDragging = false;
-    el.addEventListener('touchstart', (e) => { isDragging = true; e.stopPropagation(); });
-    window.addEventListener('touchmove', (e) => {
-        if (!isDragging) return;
-        const rect = el.parentElement.getBoundingClientRect();
-        let percent = Math.max(0, Math.min(1, (e.touches[0].clientX - rect.left) / rect.width));
-        let snappedVal = Math.max(1, Math.min(4000, Math.round((percent * 4000) / appState.gear) * appState.gear));
-        el.style.left = `${(snappedVal / 4000) * 100}%`;
-        el.innerText = snappedVal;
-        callback(snappedVal);
-    }, { passive: false });
-    window.addEventListener('touchend', () => isDragging = false);
-}
-
-    function updateMasterColor() {
-       const hCoord = Math.round((appState.penHue / 360) * 4000), sCoord = Math.round(appState.penShade * 40);
-       appState.penColor = `hsl(${appState.penHue}, ${appState.penElectric || 100}%, ${appState.penShade}%)`;
-       const bPrev = document.getElementById('brush-preview'), cBtn = document.getElementById('btn-color');
-       bPrev.style.backgroundColor = appState.penColor;
-       bPrev.style.width = bPrev.style.height = `${appState.penSize}px`;
-       cBtn.innerText = `${hCoord}.${sCoord}`;
-       cBtn.style.color = cBtn.style.borderColor = appState.penColor;
-       appState.penSize = Math.max(1, appState.penSize); 
-    }
-
-    
-    function unlockDock() {
-        document.querySelectorAll('.btn').forEach(b => b.classList.remove('locked'));
-    }
-
-        // [2026-04-28 14:58] RESOLUTION_GUARD
-async function triggerQSave() {
-    if (appState.isRelaying) return;
-    appState.isRelaying = true;
-
-    // Use RAW pixel width/height to avoid the "Smudge"
-    mctx.setTransform(1, 0, 0, 1, 0, 0); // Reset scale for the stamp
-    mctx.drawImage(temp, 0, 0);
-    mctx.scale(appState.dpr, appState.dpr); // Restore scale for drawing
-    
-    // ... rest of your Relay/Burn logic ...
-}
-
-        const qBtn = document.getElementById('btn-qsave');
-        const qBox = document.getElementById('box-qsave');
-        qBtn.classList.add('qsave-active');
-        qBox.classList.add('active-v');
-
-        // 1. STAMP: Temp to Main
-        mctx.drawImage(temp, 0, 0, main.width / appState.dpr, main.height / appState.dpr);
-        
-        // 2. THE RELAY: Move Slots
-        // Move current QSAVE to VAULT
-        appState.slot_vault = appState.slot_qsave;
-        // Capture new canvas as QSAVE
-        appState.slot_qsave = main.toDataURL("image/png");
-        
-        // Update UI Visuals
-        document.getElementById('img-qsave-v').src = appState.slot_qsave;
-        if(appState.slot_vault) document.getElementById('img-save-v').src = appState.slot_vault;
-
-        // 3. THE BOOT: Silent Download to Phone
-        if (appState.slot_vault) {
-            bootToPhone(appState.slot_vault);
-        }
-
-        // 4. CLEANUP
-        tctx.clearRect(0, 0, temp.width / appState.dpr, temp.height / appState.dpr);
-        
-        setTimeout(() => {
-            qBtn.classList.remove('qsave-active');
-            qBox.classList.remove('active-v');
-            appState.isRelaying = false;
-            console.log("DOUBLE_KICK_COMPLETE");
-        }, 1200);
-    }
-
-    function bootToPhone(data) {
-        const link = document.createElement('a');
-        link.download = `${appState.projectName}_101.png`;
-        link.href = data;
-        link.click();
-    }
-
-    // VAULT INTERACTION
-    function focusVault(type) {
-        appState.focusedVault = type;
-        document.getElementById('box-qsave').classList.toggle('active-v', type === 'qsave');
-        document.getElementById('box-save').classList.toggle('active-v', type === 'save');
-        document.getElementById('v-del-btn').classList.remove('flash');
-    }
-
-    function vaultAction(action) {
-        const targetData = appState.focusedVault === 'qsave' ? appState.slot_qsave : appState.slot_vault;
-        if (!targetData && action !== 'DELETE') return;
-
-        if (action === 'EDIT') {
-            const img = new Image();
-            img.onload = () => {
-                tctx.clearRect(0,0, temp.width, temp.height);
-                tctx.drawImage(img, 0, 0, temp.width/appState.dpr, temp.height/appState.dpr);
-                toggleOverlay('vault');
-                console.log("LOADED_TO_TEMP");
+    <!-- Initialization Execution Scripts -->
+    <script>
+        (function() {
+            // Global App State Scope Registry
+            const AppConfig = {
+                storageNamespace: 'triage_repair_engine_key',
+                activeState: 'GATEKEEPER',
+                runtimeKey: null
             };
-            img.src = targetData;
-        }
 
-        if (action === 'DELETE') {
-            const delBtn = document.getElementById('v-del-btn');
-            if (!delBtn.classList.contains('flash')) {
-                delBtn.classList.add('flash'); // First tap: "R U SURE?"
-            } else {
-                // Second tap: Confirm
-                if(appState.focusedVault === 'qsave') {
-                    appState.slot_qsave = null;
-                    document.getElementById('img-qsave-v').src = "";
-                } else {
-                    appState.slot_vault = null;
-                    document.getElementById('img-save-v').src = "";
+            // DOM Element Map
+            const DOM = {
+                overlay: document.getElementById('gatekeeper-overlay'),
+                termsCheck: document.getElementById('chk-terms-verify'),
+                stepsContainer: document.getElementById('onboarding-steps'),
+                keyInput: document.getElementById('field-api-key'),
+                lockBtn: document.getElementById('btn-submit-lock'),
+                errorMsg: document.getElementById('onboarding-error'),
+                purgeBtn: document.getElementById('btn-purge-key'),
+                workspaceHud: document.getElementById('workspace-hud')
+            };
+
+            // State Alpha Initialization Vector
+            window.addEventListener('DOMContentLoaded', () => {
+                const cachedKey = localStorage.getItem(AppConfig.storageNamespace);
+                if (cachedKey && cachedKey.startsWith('AIzaSy')) {
+                    AppConfig.runtimeKey = cachedKey;
+                    transitionToWorkspace();
                 }
-                delBtn.classList.remove('flash');
+            });
+
+            // Handle Terms Validation Gate
+            DOM.termsCheck.addEventListener('change', (e) => {
+                if (e.target.checked) {
+                    DOM.stepsContainer.style.opacity = '1';
+                    DOM.stepsContainer.style.pointerEvents = 'auto';
+                } else {
+                    DOM.stepsContainer.style.opacity = '0.4';
+                    DOM.stepsContainer.style.pointerEvents = 'none';
+                    DOM.lockBtn.disabled = true;
+                }
+            });
+
+            // Dynamic Live Input String Filtering
+            DOM.keyInput.addEventListener('input', (e) => {
+                const cleanValue = e.target.value.trim();
+                // Check prefix length minimum constraints
+                if (cleanValue.startsWith('AIzaSy') && cleanValue.length > 20) {
+                    DOM.lockBtn.disabled = false;
+                    DOM.errorMsg.style.display = 'none';
+                } else {
+                    DOM.lockBtn.disabled = true;
+                }
+            });
+
+            // Commit and Lock Key String
+            DOM.lockBtn.addEventListener('click', () => {
+                const targetedKey = DOM.keyInput.value.trim();
+                if (targetedKey.startsWith('AIzaSy') && targetedKey.length > 20) {
+                    localStorage.setItem(AppConfig.storageNamespace, targetedKey);
+                    AppConfig.runtimeKey = targetedKey;
+                    transitionToWorkspace();
+                } else {
+                    DOM.errorMsg.style.display = 'block';
+                }
+            });
+
+            // Transition UI View States & Mask Secrets Natively
+            function transitionToWorkspace() {
+                AppConfig.activeState = 'WORKSPACE';
+                
+                // Complete UI component extraction & memory clear
+                DOM.overlay.style.display = 'none';
+                DOM.keyInput.value = ''; // Atomic input buffer flash
+                
+                // Activate functional app interfaces
+                DOM.purgeBtn.style.display = 'block';
+                DOM.workspaceHud.style.display = 'block';
             }
-        }
-    }
-    
-        
 
-    function applyTool(name) {
-        appState.activeTool = name;
-        document.getElementById('btn-menu').innerText = name;
-        toggleOverlay('tools');
-    }
-
-    function toggleEdit() {
-        if (appState.activeOverlay) return;
-        appState.isEditing = !appState.isEditing;
-        document.getElementById('btn-edit').classList.toggle('active', appState.isEditing);
-    }
-
-    let colorTapTime = 0;
-        document.getElementById('btn-color').addEventListener('click', () => {
-        const now = Date.now();
-        if (now - colorTapTime < 300) {
-        const hCoord = Math.round((appState.penHue / 360) * 4000);
-        const sCoord = Math.round(appState.penShade * 40);
-        const code = `${hCoord}.${sCoord}`;
-        
-        if (appState.ledger.length >= 50) appState.ledger.pop();
-        appState.ledger.unshift({ code: code, color: appState.penColor });
-        console.log("SAVED_TO_NOTEPAD: " + code);
-            // [2026-04-28 14:58] COLOR_FLASH_RECEIPT
-document.getElementById('btn-color').addEventListener('click', () => {
-    const now = Date.now();
-    if (now - colorTapTime < 300) {
-        const hCoord = Math.round((appState.penHue / 360) * 4000);
-        const sCoord = Math.round(appState.penShade * 40);
-        const code = `${hCoord}.${sCoord}`;
-        
-        appState.ledger.unshift({ code: code, color: appState.penColor });
-        if (appState.ledger.length > 50) appState.ledger.pop();
-
-        // The Flash
-        const btn = document.getElementById('btn-color');
-        btn.style.boxShadow = '0 0 30px var(--neon-cyan), 0 0 60px var(--neon-cyan)';
-        setTimeout(() => { btn.style.boxShadow = ''; }, 150);
-        setTimeout(() => { 
-            btn.style.boxShadow = '0 0 30px var(--neon-cyan), 0 0 60px var(--neon-cyan)';
-            setTimeout(() => { btn.style.boxShadow = ''; }, 150);
-        }, 300);
-    }
-    colorTapTime = now;
-});
-    }
- 
-    function setupLoupe(el, callback) {
-    let isDragging = false;
-
-    // Only starts dragging if you touch the actual 15mm Loupe
-    el.addEventListener('touchstart', (e) => { 
-        isDragging = true; 
-        e.stopPropagation(); 
-    });
-
-    window.addEventListener('touchmove', (e) => {
-        if (!isDragging) return;
-        const rect = el.parentElement.getBoundingClientRect();
-        
-        // Calculate 0.0 to 1.0 position
-        let percent = Math.max(0, Math.min(1, (e.touches[0].clientX - rect.left) / rect.width));
-        
-        // Convert to 4000 steps and snap to current GEAR
-        let snappedVal = Math.max(1, Math.min(4000, Math.round((percent * 4000) / appState.gear) * appState.gear));
-        
-        // Move the handle visually
-        el.style.left = `${(snappedVal / 4000) * 100}%`;
-        el.innerText = snappedVal;
-        
-        // Send value back to the brush
-        callback(snappedVal);
-    }, { passive: false });
-
-    window.addEventListener('touchend', () => { 
-        isDragging = false; 
-    });
-}
-
-// NOW ACTIVATE THE BARS
-setupLoupe(document.getElementById('loupe1'), (val) => {
-    if (appState.bar1Mode === 'HUE') appState.penHue = (val/4000)*360; 
-    else appState.penShade = (val/4000)*100;
-    updateMasterColor();
-});
-
-setupLoupe(document.getElementById('loupe2'), (val) => {
-    if (appState.bar2Mode === 'ELECTRIC') appState.penElectric = (val/4000)*100; 
-    else appState.penSize = (val/4000)*100;
-    updateMasterColor();
-});
-
-    window.addEventListener('load', init);
-    window.addEventListener('resize', init);
-</script>
+            // Purge Device Memory Cache Handler
+            DOM.purgeBtn.addEventListener('click', () => {
+                localStorage.removeItem(AppConfig.storageNamespace);
+                AppConfig.runtimeKey = null;
+                AppConfig.activeState = 'GATEKEEPER';
+                
+                // Reset Viewport UI Arrays
+                DOM.termsCheck.checked = false;
+                DOM.stepsContainer.style.opacity = '0.4';
+                DOM.stepsContainer.style.pointerEvents = 'none';
+                DOM.lockBtn.disabled = true;
+                DOM.purgeBtn.style.display = 'none';
+                DOM.workspaceHud.style.display = 'none';
+                DOM.overlay.style.display = 'flex';
+            });
+        })();
+    </script>
 </body>
 </html>
