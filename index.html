@@ -4,9 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Universal Multimodal Repair Triage Suite</title>
-    <div style="display: flex; gap: 8px;">
-                <button id="btn-return-workbench" class="btn-action" style="display: none;">← Open Camera</button>
-    </div>
     <style>
         /* Base Reset & Core Fluid Theme Rules */
         * {
@@ -335,6 +332,10 @@
     <div id="app-viewport">
         <header>
             <h1>UNIVERSAL REPAIR SQUAD</h1>
+            <div style="display: flex; gap: 8px;">
+                <button id="btn-return-workbench" class="btn-action" style="display: none;">← Open Camera</button>
+    </div>
+    <style>
             <button id="btn-purge-key" class="btn-action" style="display: none;">Wipe Device Cache</button>
         </header>
 
@@ -372,12 +373,19 @@
             </section>
 
             <div id="workspace-hud">
-                <section id="processing-overlay" style="display: none;">
+                <video id="camera-feed" autoplay playsinline></video>
+                <div class="workbench-controls">
+                    <button id="btn-toggle-camera" class="btn-round" title="Flip Camera">🔄</button>
+                    <button id="btn-run-analysis" class="btn-triage">Analyze Problem</button>
+                </div>
+            </div>
+
+            <section id="processing-overlay" style="display: none;">
                 <div class="spinner"></div>
-                <h3 style="color: #ffffff; margin-bottom: 8px;">Analyzing Image Vectors</h3>
+                <h3 style="color: #ffffff; margin-bottom: 8px; margin-top: 16px;">Analyzing Image Vectors</h3>
                 
                 <div style="background-color: #14181f; border: 1px solid #232a36; padding: 16px; border-radius: 8px; max-width: 320px; text-align: center; margin-top: 12px;">
-                    <span style="font-size: 0.75rem; color: #ff9d00; font-weight: 600; uppercase; letter-spacing: 1px; display: block; margin-bottom: 6px;">Triage Fact Bite</span>
+                    <span style="font-size: 0.75rem; color: #ff9d00; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; display: block; margin-bottom: 6px;">Triage Fact Bite</span>
                     <p id="fact-display-target" style="color: #cbd5e1; font-size: 0.85rem; line-height: 1.4;">Preparing system diagnostics...</p>
                 </div>
             </section>
@@ -389,7 +397,6 @@
                 </div>
                 <div id="results-content-target" style="color: #cbd5e1; font-size: 0.95rem; line-height: 1.6;"></div>
             </section>
-                <video id="camera-feed" autoplay playsinline></video>
 
                 <div class="workbench-controls">
                     <button id="btn-toggle-camera" class="btn-round" title="Flip Camera">🔄</button>
