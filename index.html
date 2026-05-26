@@ -400,7 +400,7 @@
         </main>
     </div>
 
-    <            <script>
+    <script>
         (function() {
             // Global App State Scope Registry
             const AppConfig = {
@@ -411,7 +411,7 @@
                 activeState: 'GATEKEEPER',
                 runtimeKey: null,
                 cameraStream: null,
-                currentFacingMode: 'environment', // 'environment' = back camera, 'user' = front camera
+                currentFacingMode: 'environment', // 'environment' = back lens, 'user' = front selfie
                 factInterval: null
             };
 
@@ -450,7 +450,6 @@
                 if (cachedKey && cachedKey.startsWith('AIzaSy')) {
                     AppConfig.runtimeKey = cachedKey;
                     
-                    // Safety check: If user had an uncompleted repair stored, jump straight back to it
                     if (cachedSteps) {
                         setApplicationState('DISPLAY_STEPS', cachedSteps);
                     } else {
@@ -464,11 +463,13 @@
             // Central Application State Machine Controller
             function setApplicationState(targetState, payload = null) {
                 AppConfig.activeState = targetState;
-                
-                // Clear any running timers to prevent background memory leaks
                 clearInterval(AppConfig.factInterval);
 
-                // Default Reset: Hide all primary UI layers dynamically
+                // Stop any reading voices immediately when moving states
+                if (window.speechSynthesis) {
+                    window.speechSynthesis.cancel();
+                }
+
                 DOM.overlay.style.display = 'none';
                 DOM.workspaceHud.style.display = 'none';
                 DOM.processingOverlay.style.display = 'none';
@@ -489,7 +490,7 @@
                         break;
 
                     case 'LOADING':
-                        DOM.workspaceHud.style.display = 'block'; // Keep viewfinder behind glass if needed
+                        DOM.workspaceHud.style.display = 'block'; 
                         DOM.processingOverlay.style.display = 'flex';
                         startFactRotationLoop();
                         break;
@@ -498,11 +499,13 @@
                         DOM.resultsPanel.style.display = 'block';
                         DOM.returnWorkbenchBtn.style.display = 'block';
                         DOM.purgeBtn.style.display = 'block';
-                        teardownHardwareTracks(); // Free camera lens while reading instructions
+                        teardownHardwareTracks(); 
                         
                         if (payload) {
                             DOM.resultsTarget.innerHTML = payload;
                             localStorage.setItem(AppConfig.keys.cache, payload);
+                            // Read out the text steps hands-free
+                            executeVoiceSynthesis(DOM.resultsTarget.textContent);
                         }
                         break;
                 }
@@ -511,10 +514,8 @@
             // Fact Rotation Timing Management Loop
             function startFactRotationLoop() {
                 let currentIndex = 0;
-                // Instantly display the first random fact
                 DOM.factDisplay.textContent = RepairFacts[currentIndex];
                 
-                // Rotate to a new fact every 5 seconds
                 AppConfig.factInterval = setInterval(() => {
                     currentIndex = (currentIndex + 1) % RepairFacts.length;
                     DOM.factDisplay.textContent = RepairFacts[currentIndex];
@@ -576,7 +577,7 @@
                     DOM.video.srcObject = AppConfig.cameraStream;
                 } catch (err) {
                     console.error("Camera access error: ", err);
-                    alert("Unable to open the camera stream. Please check system permissions.");
+                    alert("Unable to open the camera stream. Please verify your phone browser layout permissions.");
                 }
             }
 
@@ -596,26 +597,82 @@
 
             // Return to Camera Event from Results View
             DOM.returnWorkbenchBtn.addEventListener('click', () => {
-                // Clear the active cache so it doesn't permanently lock the view on reload
                 localStorage.removeItem(AppConfig.keys.cache);
                 setApplicationState('WORKSPACE');
             });
 
-            // Temporary Simulation Click Handler for Testing Block 3 Interface
-            DOM.runAnalysisBtn.addEventListener('click', () => {
-                setApplicationState('LOADING');
+            // Hands-Free Audio Voice Synthesizer Driver
+            function executeVoiceSynthesis(rawText) {
+                if ('speechSynthesis' in window) {
+                    // Clean up text formatting slightly for smoother pronunciation
+                    const speechText = rawText.replace(/Step \d+:/gi, '').trim();
+                    const utterance = new SpeechSynthesisUtterance(speechText);
+                    utterance.rate = 0.95; // Slightly slower, highly deliberate pacing
+                    window.speechSynthesis.speak(utterance);
+                }
+            }
+
+            // Core Live Image Snapper & API Dispatch Engine
+            DOM.runAnalysisBtn.addEventListener('click', async () => {
+                if (!AppConfig.runtimeKey) return alert("Missing runtime authorization validation token.");
                 
-                // Simulate a 6-second API processing wait, then reveal dummy repair instructions
-                setTimeout(() => {
-                    const dummyPayload = `
-                        <ol style="padding-left: 20px; margin-top: 10px;">
-                            <li style="margin-bottom: 12px;"><strong>Isolate Electrical Group:</strong> Turn off system ignition completely before touching the visual lead points.</li>
-                            <li style="margin-bottom: 12px;"><strong>Clear Exterior Contamination:</strong> Wipe excess oil sludge from the harness casing using a clean dry shop rag.</li>
-                            <li style="margin-bottom: 12px;"><strong>Reseat Connection Clips:</strong> Depress the upper locking plastic thumb tang firmly until an audible click engagement pattern registers.</li>
-                        </ol>
-                    `;
-                    setApplicationState('DISPLAY_STEPS', dummyPayload);
-                }, 6000);
+                setApplicationState('LOADING');
+
+                try {
+                    // 1. Create off-screen canvas container to capture frozen video frame
+                    const snapCanvas = document.createElement('canvas');
+                    snapCanvas.width = DOM.video.videoWidth || 640;
+                    snapCanvas.height = DOM.video.videoHeight || 480;
+                    
+                    const snapCtx = snapCanvas.getContext('2d');
+                    snapCtx.drawImage(DOM.video, 0, 0, snapCanvas.width, snapCanvas.height);
+                    
+                    // 2. Extract Base64 string data representation out of image bytes
+                    const dataUrl = snapCanvas.toDataURL('image/jpeg', 0.85);
+                    const base64Data = dataUrl.split(',')[1];
+
+                    // 3. Assemble structural raw multi-modal endpoint payload request array
+                    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${AppConfig.runtimeKey}`;
+                    
+                    const payload = {
+                        contents: [{
+                            parts: [
+                                { text: "You are an expert mechanical technician and high-detail technical writer. Examine this live visual image component carefully. Diagnose any visible layout defects, fractures, leaks, degradation, or wounds. Deliver an exact, fast triage list containing clear, concise, step-by-step numbered repair actions. Format each step as a short paragraph using standard HTML text formatting tags like <ol> and <li>. Do not write markdown tags or tick marks." },
+                                {
+                                    inlineData: {
+                                        mimeType: "image/jpeg",
+                                        data: base64Data
+                                    }
+                                }
+                            ]
+                        }]
+                    };
+
+                    // 4. Dispatch async fetch stream transaction directly to Google core
+                    const response = await fetch(endpoint, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`API Transaction Fault: ${response.status}`);
+                    }
+
+                    const jsonResult = await response.json();
+                    let responseText = jsonResult.contents[0].parts[0].text;
+
+                    // Clean out accidental markdown fences if the model slipped up
+                    responseText = responseText.replace(/```html/g, '').replace(/```/g, '').trim();
+
+                    // 5. Fire text and trigger hands-free audio sequence
+                    setApplicationState('DISPLAY_STEPS', responseText);
+
+                } catch (apiErr) {
+                    console.error("Triage Pipeline Faulted: ", apiErr);
+                    alert("Analysis transmission failed. Check internet access or validation key limitations.");
+                    setApplicationState('WORKSPACE');
+                }
             });
 
             // Purge Device Memory Cache Handler
@@ -633,6 +690,6 @@
                 setApplicationState('GATEKEEPER');
             });
         })();
-    </script>
+</script>  
 </body>
 </html>
