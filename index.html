@@ -228,9 +228,73 @@
         /* Core Application UI Panels (Hidden by Default) */
         #workspace-hud {
             display: none;
-            padding: 16px;
-            color: #a3b0c2;
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 5;
+        }
+
+        #camera-feed {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            background-color: #000000;
+        }
+
+        /* Pure Overlay Controls Layout */
+        .workbench-controls {
+            position: absolute;
+            bottom: 24px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 10;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background-color: rgba(20, 24, 31, 0.85);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(56, 67, 87, 0.6);
+            border-radius: 30px;
+            padding: 10px 20px;
+            width: calc(100% - 32px);
+            max-width: 400px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+        }
+
+        .btn-round {
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            background-color: #232a36;
+            border: 1px solid #384357;
+            color: #ffffff;
+            font-size: 1.2rem;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .btn-round:active {
+            background-color: #384357;
+        }
+
+        .btn-triage {
+            background-color: #ff9d00;
+            color: #0d0f12;
+            border: none;
+            padding: 10px 24px;
+            border-radius: 22px;
+            font-weight: 600;
             font-size: 0.9rem;
+            cursor: pointer;
+        }
+
+        .btn-triage:active {
+            background-color: #e08a00;
         }
     </style>
 </head>
@@ -276,9 +340,11 @@
             </section>
 
             <div id="workspace-hud">
-                <div style="background-color: #14181f; border: 1px solid #232a36; padding: 16px; border-radius: 8px;">
-                    <h3>Engine Verified & Loaded Successfully.</h3>
-                    <p style="margin-top: 8px; font-size: 0.85rem; color: #7b889b;">The key has been locked down into hardware localStorage sandbox. Ready for Phase 2: Touch Matrix integration loop.</p>
+                <video id="camera-feed" autoplay playsinline></video>
+
+                <div class="workbench-controls">
+                    <button id="btn-toggle-camera" class="btn-round" title="Flip Camera">🔄</button>
+                    <button id="btn-run-analysis" class="btn-triage">Analyze Problem</button>
                 </div>
             </div>
 
@@ -291,7 +357,9 @@
             const AppConfig = {
                 storageNamespace: 'triage_repair_engine_key',
                 activeState: 'GATEKEEPER',
-                runtimeKey: null
+                runtimeKey: null,
+                cameraStream: null,
+                currentFacingMode: 'environment' // 'environment' = rear camera, 'user' = front selfie camera
             };
 
             // DOM Element Map
@@ -303,7 +371,10 @@
                 lockBtn: document.getElementById('btn-submit-lock'),
                 errorMsg: document.getElementById('onboarding-error'),
                 purgeBtn: document.getElementById('btn-purge-key'),
-                workspaceHud: document.getElementById('workspace-hud')
+                workspaceHud: document.getElementById('workspace-hud'),
+                video: document.getElementById('camera-feed'),
+                toggleCamBtn: document.getElementById('btn-toggle-camera'),
+                runAnalysisBtn: document.getElementById('btn-run-analysis')
             };
 
             // State Alpha Initialization Vector
@@ -330,7 +401,6 @@
             // Dynamic Live Input String Filtering
             DOM.keyInput.addEventListener('input', (e) => {
                 const cleanValue = e.target.value.trim();
-                // Check prefix length minimum constraints
                 if (cleanValue.startsWith('AIzaSy') && cleanValue.length > 20) {
                     DOM.lockBtn.disabled = false;
                     DOM.errorMsg.style.display = 'none';
@@ -351,26 +421,64 @@
                 }
             });
 
-            // Transition UI View States & Mask Secrets Natively
+            // Hardware Camera Stream Control Pipeline
+            async function initCameraSystem() {
+                if (AppConfig.cameraStream) {
+                    teardownHardwareTracks();
+                }
+                
+                try {
+                    const constraints = {
+                        video: {
+                            facingMode: { ideal: AppConfig.currentFacingMode },
+                            width: { ideal: 1280 },
+                            height: { ideal: 720 }
+                        },
+                        audio: false
+                    };
+                    
+                    AppConfig.cameraStream = await navigator.mediaDevices.getUserMedia(constraints);
+                    DOM.video.srcObject = AppConfig.cameraStream;
+                } catch (err) {
+                    console.error("Camera access error: ", err);
+                    alert("Unable to open the camera stream. Please check system permissions.");
+                }
+            }
+
+            // Cleanly release hardware drivers when switching or closing
+            function teardownHardwareTracks() {
+                if (AppConfig.cameraStream) {
+                    AppConfig.cameraStream.getTracks().forEach(track => track.stop());
+                    AppConfig.cameraStream = null;
+                }
+            }
+
+            // Flip Camera Toggle Event
+            DOM.toggleCamBtn.addEventListener('click', () => {
+                AppConfig.currentFacingMode = (AppConfig.currentFacingMode === 'environment') ? 'user' : 'environment';
+                initCameraSystem();
+            });
+
+            // Transition UI View States & Initialize Viewfinder
             function transitionToWorkspace() {
                 AppConfig.activeState = 'WORKSPACE';
                 
-                // Complete UI component extraction & memory clear
                 DOM.overlay.style.display = 'none';
-                DOM.keyInput.value = ''; // Atomic input buffer flash
+                DOM.keyInput.value = ''; 
                 
-                // Activate functional app interfaces
                 DOM.purgeBtn.style.display = 'block';
                 DOM.workspaceHud.style.display = 'block';
+                
+                initCameraSystem();
             }
 
             // Purge Device Memory Cache Handler
             DOM.purgeBtn.addEventListener('click', () => {
+                teardownHardwareTracks();
                 localStorage.removeItem(AppConfig.storageNamespace);
                 AppConfig.runtimeKey = null;
                 AppConfig.activeState = 'GATEKEEPER';
                 
-                // Reset Viewport UI Arrays
                 DOM.termsCheck.checked = false;
                 DOM.stepsContainer.style.opacity = '0.4';
                 DOM.stepsContainer.style.pointerEvents = 'none';
